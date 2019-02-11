@@ -5,5 +5,6 @@
 void SaveWavFile(const char *filename);
 
 int main(void) {
-  wav::SaveWavFile("test.wav");
+  wav::stream ws;
+  ws.save_to_file("test.wav");
 }

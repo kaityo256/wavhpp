@@ -1,5 +1,5 @@
 /*
-  Copyright (C) 2013, Hiroshi Watanabe
+  Copyright (C) 2019 - present, Hiroshi Watanabe
   All rights reserved.
 
   Redistribution and use in source and binary forms,
@@ -31,7 +31,7 @@
 #pragma once
 
 #include <cmath>
-#include <cstdio>
+#include <iostream>
 #include <vector>
 
 namespace wav {
@@ -51,50 +51,54 @@ typedef struct {
   WORD cbSize;
 } WAVEFORMATEX;
 
-void SaveWavFile(const char *filename) {
+struct stream {
+  std::vector<BYTE> bWave;
   const DWORD SRATE = 11025; // Sampling Rate (11025Hz)
-  const int totalsec = 2;    // Length of Data [sec]
   const DWORD dwFmtSize = 16;
-  const DWORD dwWaveSize = SRATE * totalsec; // Size of Data
-  const DWORD dwFileSize = dwWaveSize + 36;  // Size of File
 
-  WAVEFORMATEX wfe;
-
-  FILE *fp = fopen(filename, "wb");
-  if (fp == NULL) {
-    printf("Failed to open %s.", filename);
-    return;
+  stream() {
+    const int totalsec = 2; // Length of Data [sec]
+    const double Pi = M_PI;
+    double f = (double)440.0 / (double)SRATE; //(440.0Hz)
+    int size = SRATE * totalsec;
+    for (int i = 0; i < size; i++) {
+      double phase = (double)i * f * Pi * 2.0;
+      BYTE c = static_cast<BYTE>(sin(phase) * 128 + 128);
+      bWave.push_back(c);
+    }
   }
 
-  fwrite("RIFF", sizeof(BYTE), 4, fp);
-  fwrite(&dwFileSize, sizeof(DWORD), 1, fp);
-  fwrite("WAVE", sizeof(BYTE), 4, fp);
+  void save_to_file(const char *filename) {
 
-  wfe.wFormatTag = WAVE_FORMAT_PCM; // Fileformat (PCM)
-  wfe.nChannels = 1;
-  wfe.nSamplesPerSec = SRATE;
-  wfe.nAvgBytesPerSec = SRATE;
-  wfe.wBitsPerSample = 8;
-  wfe.nBlockAlign = wfe.nChannels * wfe.wBitsPerSample / 8;
+    WAVEFORMATEX wfe;
+    DWORD dwWaveSize = bWave.size();
+    const DWORD dwFileSize = dwWaveSize + 36; // Size of File
 
-  // BYTE *bWave = new BYTE[dwWaveSize];
-  std::vector<BYTE> bWave(dwWaveSize);
+    FILE *fp = fopen(filename, "wb");
+    if (fp == NULL) {
+      std::cerr << "Failed to open " << filename << std::endl;
+      return;
+    }
 
-  const double Pi = M_PI;
-  double f = (double)440.0 / (double)SRATE; //(440.0Hz)
-  for (unsigned int i = 0; i < dwWaveSize; i++) {
-    double phase = (double)i * f * Pi * 2.0;
-    bWave[i] = (BYTE)(sin(phase) * 128 + 128);
+    fwrite("RIFF", sizeof(BYTE), 4, fp);
+    fwrite(&dwFileSize, sizeof(DWORD), 1, fp);
+    fwrite("WAVE", sizeof(BYTE), 4, fp);
+
+    wfe.wFormatTag = WAVE_FORMAT_PCM; // Fileformat (PCM)
+    wfe.nChannels = 1;
+    wfe.nSamplesPerSec = SRATE;
+    wfe.nAvgBytesPerSec = SRATE;
+    wfe.wBitsPerSample = 8;
+    wfe.nBlockAlign = wfe.nChannels * wfe.wBitsPerSample / 8;
+
+    fwrite("fmt ", sizeof(BYTE), 4, fp);
+    fwrite(&dwFmtSize, sizeof(DWORD), 1, fp);
+    fwrite(&wfe, 1, 16, fp);
+    fwrite("data", sizeof(BYTE), 4, fp);
+    fwrite(&dwWaveSize, sizeof(DWORD), 1, fp);
+    fwrite(bWave.data(), sizeof(BYTE), dwWaveSize, fp);
+
+    fclose(fp);
   }
-
-  fwrite("fmt ", sizeof(BYTE), 4, fp);
-  fwrite(&dwFmtSize, sizeof(DWORD), 1, fp);
-  fwrite(&wfe, 1, 16, fp);
-  fwrite("data", sizeof(BYTE), 4, fp);
-  fwrite(&dwWaveSize, sizeof(DWORD), 1, fp);
-  fwrite(bWave.data(), sizeof(BYTE), dwWaveSize, fp);
-
-  // delete bWave;
-  fclose(fp);
-}
+};
 } // namespace wav
